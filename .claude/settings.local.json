@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(cmd /c \"type C:\\\\Users\\\\tommy\\\\aea-backend\\\\scripts\\\\setup-tables.sql\")",
+      "Bash(cmd /c type:*)",
+      "Bash(powershell -Command:*)",
+      "Bash(node:*)",
+      "Bash(curl:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

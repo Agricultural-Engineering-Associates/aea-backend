@@ -25,10 +25,10 @@ router.get('/me', (req, res) => {
 router.get('/dashboard', async (req, res) => {
   try {
     const [pages, staff, projects, unreadContacts] = await Promise.all([
-      PageContent.countDocuments(),
-      StaffMember.countDocuments(),
-      Project.countDocuments(),
-      ContactSubmission.countDocuments({ isRead: false })
+      PageContent.count(),
+      StaffMember.count(),
+      Project.count(),
+      ContactSubmission.getUnreadCount()
     ]);
 
     res.json({ pages, staff, projects, unreadContacts });
@@ -43,7 +43,7 @@ router.get('/dashboard', async (req, res) => {
 // GET /api/admin/pages
 router.get('/pages', async (req, res) => {
   try {
-    const pages = await PageContent.find().sort({ pageName: 1 });
+    const pages = await PageContent.getAll();
     res.json(pages);
   } catch (error) {
     console.error('Error fetching pages:', error);
@@ -54,7 +54,7 @@ router.get('/pages', async (req, res) => {
 // GET /api/admin/pages/:pageName
 router.get('/pages/:pageName', async (req, res) => {
   try {
-    const page = await PageContent.findOne({ pageName: req.params.pageName });
+    const page = await PageContent.findByPageName(req.params.pageName);
     if (!page) {
       return res.status(404).json({ error: 'Page not found' });
     }
@@ -78,7 +78,7 @@ router.post('/pages', [
   try {
     const { pageName, sections } = req.body;
 
-    const existing = await PageContent.findOne({ pageName });
+    const existing = await PageContent.findByPageName(pageName);
     if (existing) {
       return res.status(409).json({ error: 'Page already exists' });
     }
@@ -95,11 +95,7 @@ router.post('/pages', [
 router.put('/pages/:pageName', async (req, res) => {
   try {
     const { sections } = req.body;
-    const page = await PageContent.findOneAndUpdate(
-      { pageName: req.params.pageName },
-      { sections },
-      { new: true, runValidators: true }
-    );
+    const page = await PageContent.updateSections(req.params.pageName, sections);
 
     if (!page) {
       return res.status(404).json({ error: 'Page not found' });
@@ -116,7 +112,7 @@ router.put('/pages/:pageName', async (req, res) => {
 router.post('/pages/:pageName/image', upload.single('image'), async (req, res) => {
   try {
     const { sectionName } = req.body;
-    const page = await PageContent.findOne({ pageName: req.params.pageName });
+    const page = await PageContent.findByPageName(req.params.pageName);
 
     if (!page) {
       return res.status(404).json({ error: 'Page not found' });
@@ -129,9 +125,9 @@ router.post('/pages/:pageName/image', upload.single('image'), async (req, res) =
 
     section.imageUrl = req.file.path;
     section.imageAlt = req.body.imageAlt || '';
-    await page.save();
 
-    res.json(page);
+    const updated = await PageContent.updateSections(req.params.pageName, page.sections);
+    res.json(updated);
   } catch (error) {
     console.error('Error uploading page image:', error);
     res.status(500).json({ error: 'Failed to upload image' });
@@ -141,7 +137,7 @@ router.post('/pages/:pageName/image', upload.single('image'), async (req, res) =
 // DELETE /api/admin/pages/:pageName
 router.delete('/pages/:pageName', async (req, res) => {
   try {
-    const page = await PageContent.findOneAndDelete({ pageName: req.params.pageName });
+    const page = await PageContent.deleteByPageName(req.params.pageName);
     if (!page) {
       return res.status(404).json({ error: 'Page not found' });
     }
@@ -162,11 +158,10 @@ router.put('/settings', async (req, res) => {
       phone, email, website, socialLinks
     } = req.body;
 
-    const settings = await Settings.findOneAndUpdate(
-      {},
-      { businessName, address, city, state, zip, phone, email, website, socialLinks },
-      { new: true, upsert: true, runValidators: true }
-    );
+    const settings = await Settings.update({
+      businessName, address, city, state, zip,
+      phone, email, website, socialLinks
+    });
 
     res.json(settings);
   } catch (error) {
@@ -180,7 +175,7 @@ router.put('/settings', async (req, res) => {
 // GET /api/admin/staff
 router.get('/staff', async (req, res) => {
   try {
-    const staff = await StaffMember.find().sort({ displayOrder: 1 });
+    const staff = await StaffMember.getAll();
     res.json(staff);
   } catch (error) {
     console.error('Error fetching staff:', error);
@@ -232,11 +227,7 @@ router.put('/staff/:id', upload.single('photo'), async (req, res) => {
     if (isActive !== undefined) updateData.isActive = isActive === 'true' || isActive === true;
     if (req.file) updateData.photoUrl = req.file.path;
 
-    const member = await StaffMember.findByIdAndUpdate(
-      req.params.id,
-      updateData,
-      { new: true, runValidators: true }
-    );
+    const member = await StaffMember.update(req.params.id, updateData);
 
     if (!member) {
       return res.status(404).json({ error: 'Staff member not found' });
@@ -252,7 +243,7 @@ router.put('/staff/:id', upload.single('photo'), async (req, res) => {
 // DELETE /api/admin/staff/:id
 router.delete('/staff/:id', async (req, res) => {
   try {
-    const member = await StaffMember.findByIdAndDelete(req.params.id);
+    const member = await StaffMember.delete(req.params.id);
     if (!member) {
       return res.status(404).json({ error: 'Staff member not found' });
     }
@@ -268,7 +259,7 @@ router.delete('/staff/:id', async (req, res) => {
 // GET /api/admin/projects
 router.get('/projects', async (req, res) => {
   try {
-    const projects = await Project.find().sort({ category: 1, displayOrder: 1 });
+    const projects = await Project.getAll();
     res.json(projects);
   } catch (error) {
     console.error('Error fetching projects:', error);
@@ -328,11 +319,7 @@ router.put('/projects/:id', upload.single('image'), async (req, res) => {
     if (isActive !== undefined) updateData.isActive = isActive === 'true' || isActive === true;
     if (req.file) updateData.imageUrl = req.file.path;
 
-    const project = await Project.findByIdAndUpdate(
-      req.params.id,
-      updateData,
-      { new: true, runValidators: true }
-    );
+    const project = await Project.update(req.params.id, updateData);
 
     if (!project) {
       return res.status(404).json({ error: 'Project not found' });
@@ -348,7 +335,7 @@ router.put('/projects/:id', upload.single('image'), async (req, res) => {
 // DELETE /api/admin/projects/:id
 router.delete('/projects/:id', async (req, res) => {
   try {
-    const project = await Project.findByIdAndDelete(req.params.id);
+    const project = await Project.delete(req.params.id);
     if (!project) {
       return res.status(404).json({ error: 'Project not found' });
     }
@@ -364,7 +351,7 @@ router.delete('/projects/:id', async (req, res) => {
 // GET /api/admin/contacts
 router.get('/contacts', async (req, res) => {
   try {
-    const contacts = await ContactSubmission.find().sort({ createdAt: -1 });
+    const contacts = await ContactSubmission.getAll();
     res.json(contacts);
   } catch (error) {
     console.error('Error fetching contacts:', error);
@@ -375,11 +362,7 @@ router.get('/contacts', async (req, res) => {
 // PUT /api/admin/contacts/:id/read
 router.put('/contacts/:id/read', async (req, res) => {
   try {
-    const contact = await ContactSubmission.findByIdAndUpdate(
-      req.params.id,
-      { isRead: true },
-      { new: true }
-    );
+    const contact = await ContactSubmission.markAsRead(req.params.id);
 
     if (!contact) {
       return res.status(404).json({ error: 'Contact submission not found' });
@@ -395,7 +378,7 @@ router.put('/contacts/:id/read', async (req, res) => {
 // DELETE /api/admin/contacts/:id
 router.delete('/contacts/:id', async (req, res) => {
   try {
-    const contact = await ContactSubmission.findByIdAndDelete(req.params.id);
+    const contact = await ContactSubmission.delete(req.params.id);
     if (!contact) {
       return res.status(404).json({ error: 'Contact submission not found' });
     }

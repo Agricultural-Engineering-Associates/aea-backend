@@ -1,42 +1,76 @@
-const mongoose = require('mongoose');
+const supabase = require('../config/db');
+const { transformRow } = require('./utils');
 
-const sectionSchema = new mongoose.Schema({
-  sectionName: {
-    type: String,
-    required: true
-  },
-  content: {
-    type: String,
-    default: ''
-  },
-  imageUrl: {
-    type: String,
-    default: ''
-  },
-  imageAlt: {
-    type: String,
-    default: ''
-  }
-}, { _id: false });
+const findByPageName = async (pageName) => {
+  const { data, error } = await supabase
+    .from('page_contents')
+    .select('*')
+    .eq('page_name', pageName)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? transformRow(data) : null;
+};
 
-const pageContentSchema = new mongoose.Schema({
-  pageName: {
-    type: String,
-    required: true,
-    unique: true,
-    index: true,
-    trim: true
-  },
-  sections: [sectionSchema]
-}, { timestamps: true });
+const getAll = async () => {
+  const { data, error } = await supabase
+    .from('page_contents')
+    .select('*')
+    .order('page_name');
+  if (error) throw error;
+  return (data || []).map(transformRow);
+};
 
-pageContentSchema.set('toJSON', {
-  transform: (doc, ret) => {
-    ret.id = ret._id.toString();
-    delete ret._id;
-    delete ret.__v;
-    return ret;
-  }
-});
+const create = async ({ pageName, sections }) => {
+  const { data, error } = await supabase
+    .from('page_contents')
+    .insert({ page_name: pageName, sections: sections || [] })
+    .select()
+    .single();
+  if (error) throw error;
+  return transformRow(data);
+};
 
-module.exports = mongoose.model('PageContent', pageContentSchema);
+const updateSections = async (pageName, sections) => {
+  const { data, error } = await supabase
+    .from('page_contents')
+    .update({ sections })
+    .eq('page_name', pageName)
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  return data ? transformRow(data) : null;
+};
+
+const upsert = async (pageName, sections) => {
+  const { data, error } = await supabase
+    .from('page_contents')
+    .upsert(
+      { page_name: pageName, sections: sections || [] },
+      { onConflict: 'page_name' }
+    )
+    .select()
+    .single();
+  if (error) throw error;
+  return transformRow(data);
+};
+
+const deleteByPageName = async (pageName) => {
+  const { data, error } = await supabase
+    .from('page_contents')
+    .delete()
+    .eq('page_name', pageName)
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  return data ? transformRow(data) : null;
+};
+
+const count = async () => {
+  const { count: total, error } = await supabase
+    .from('page_contents')
+    .select('*', { count: 'exact', head: true });
+  if (error) throw error;
+  return total;
+};
+
+module.exports = { findByPageName, getAll, create, updateSections, upsert, deleteByPageName, count };

@@ -1,32 +1,34 @@
-const mongoose = require('mongoose');
+const supabase = require('../config/db');
+const { transformRow } = require('./utils');
 
-const adminSchema = new mongoose.Schema({
-  email: {
-    type: String,
-    required: true,
-    unique: true,
-    lowercase: true,
-    trim: true
-  },
-  passwordHash: {
-    type: String,
-    required: true
-  },
-  name: {
-    type: String,
-    required: true,
-    trim: true
-  }
-}, { timestamps: true });
+const findByEmail = async (email) => {
+  const { data, error } = await supabase
+    .from('admins')
+    .select('*')
+    .eq('email', email.toLowerCase())
+    .maybeSingle();
+  if (error) throw error;
+  return data ? transformRow(data) : null;
+};
 
-adminSchema.set('toJSON', {
-  transform: (doc, ret) => {
-    ret.id = ret._id.toString();
-    delete ret._id;
-    delete ret.__v;
-    delete ret.passwordHash;
-    return ret;
-  }
-});
+const findById = async (id) => {
+  const { data, error } = await supabase
+    .from('admins')
+    .select('id, email, name, created_at, updated_at')
+    .eq('id', id)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? transformRow(data) : null;
+};
 
-module.exports = mongoose.model('Admin', adminSchema);
+const create = async ({ email, passwordHash, name }) => {
+  const { data, error } = await supabase
+    .from('admins')
+    .insert({ email: email.toLowerCase(), password_hash: passwordHash, name })
+    .select('id, email, name, created_at, updated_at')
+    .single();
+  if (error) throw error;
+  return transformRow(data);
+};
+
+module.exports = { findByEmail, findById, create };

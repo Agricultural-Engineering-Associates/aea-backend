@@ -1,41 +1,69 @@
-const mongoose = require('mongoose');
+const supabase = require('../config/db');
+const { transformRow, toDB } = require('./utils');
 
-const staffMemberSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  title: {
-    type: String,
-    default: '',
-    trim: true
-  },
-  bio: {
-    type: String,
-    default: ''
-  },
-  photoUrl: {
-    type: String,
-    default: ''
-  },
-  displayOrder: {
-    type: Number,
-    default: 0
-  },
-  isActive: {
-    type: Boolean,
-    default: true
+const getAll = async (activeOnly = false) => {
+  let query = supabase
+    .from('staff_members')
+    .select('*')
+    .order('display_order');
+  if (activeOnly) {
+    query = query.eq('is_active', true);
   }
-}, { timestamps: true });
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data || []).map(transformRow);
+};
 
-staffMemberSchema.set('toJSON', {
-  transform: (doc, ret) => {
-    ret.id = ret._id.toString();
-    delete ret._id;
-    delete ret.__v;
-    return ret;
-  }
-});
+const getById = async (id) => {
+  const { data, error } = await supabase
+    .from('staff_members')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? transformRow(data) : null;
+};
 
-module.exports = mongoose.model('StaffMember', staffMemberSchema);
+const create = async (memberData) => {
+  const dbData = toDB(memberData);
+  const { data, error } = await supabase
+    .from('staff_members')
+    .insert(dbData)
+    .select()
+    .single();
+  if (error) throw error;
+  return transformRow(data);
+};
+
+const update = async (id, updateData) => {
+  const dbData = toDB(updateData);
+  const { data, error } = await supabase
+    .from('staff_members')
+    .update(dbData)
+    .eq('id', id)
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  return data ? transformRow(data) : null;
+};
+
+const remove = async (id) => {
+  const { data, error } = await supabase
+    .from('staff_members')
+    .delete()
+    .eq('id', id)
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  return data ? transformRow(data) : null;
+};
+
+const count = async () => {
+  const { count: total, error } = await supabase
+    .from('staff_members')
+    .select('*', { count: 'exact', head: true });
+  if (error) throw error;
+  return total;
+};
+
+module.exports = { getAll, getById, create, update, delete: remove, count };

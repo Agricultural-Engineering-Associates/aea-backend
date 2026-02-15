@@ -19,7 +19,7 @@ router.post('/login', [
   try {
     const { email, password } = req.body;
 
-    const admin = await Admin.findOne({ email });
+    const admin = await Admin.findByEmail(email);
     if (!admin) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -30,7 +30,7 @@ router.post('/login', [
     }
 
     const token = jwt.sign(
-      { id: admin._id },
+      { id: admin.id },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
@@ -38,7 +38,7 @@ router.post('/login', [
     res.json({
       token,
       admin: {
-        id: admin._id,
+        id: admin.id,
         email: admin.email,
         name: admin.name
       }

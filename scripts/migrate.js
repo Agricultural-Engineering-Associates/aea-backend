@@ -1,9 +1,5 @@
 require('dotenv').config();
-const mongoose = require('mongoose');
-const PageContent = require('../models/PageContent');
-const Settings = require('../models/Settings');
-const StaffMember = require('../models/StaffMember');
-const Project = require('../models/Project');
+const supabase = require('../config/db');
 
 const pages = [
   {
@@ -207,7 +203,7 @@ const pages = [
 ];
 
 const defaultSettings = {
-  businessName: 'Agricultural Engineering Associates',
+  business_name: 'Agricultural Engineering Associates',
   address: '',
   city: '',
   state: '',
@@ -215,12 +211,10 @@ const defaultSettings = {
   phone: '1-800-499-5893',
   email: '',
   website: '',
-  socialLinks: {
-    facebook: '',
-    instagram: '',
-    twitter: '',
-    linkedin: ''
-  }
+  facebook: '',
+  instagram: '',
+  twitter: '',
+  linkedin: ''
 };
 
 const staffMembers = [
@@ -228,25 +222,25 @@ const staffMembers = [
     name: 'John A. George, P.E.',
     title: 'President / Principal Engineer',
     bio: 'John A. George, P.E., is the founder and president of Agricultural Engineering Associates. With over 35 years of experience in agricultural engineering, John has led the design and construction management of livestock facilities across the United States and in more than 20 countries worldwide. He holds a Bachelor of Science in Agricultural Engineering from Penn State University and is a registered Professional Engineer. John has served as an expert witness in numerous legal proceedings and is a recognized authority on livestock facility design, animal environment engineering, and comprehensive nutrient management planning. His career has been defined by a commitment to practical, cost-effective engineering solutions that serve the needs of agricultural producers.',
-    photoUrl: '',
-    displayOrder: 1,
-    isActive: true
+    photo_url: '',
+    display_order: 1,
+    is_active: true
   },
   {
     name: 'L. Frank Young',
     title: 'Senior Engineer / Associate',
     bio: 'L. Frank Young is a senior engineer and associate at Agricultural Engineering Associates. Frank brings extensive experience in livestock facility design, site development, and environmental engineering to the firm. He has been instrumental in the design of dairy, swine, and poultry facilities throughout the eastern United States and has participated in international projects in Central America and the Caribbean. Frank holds a degree in Agricultural Engineering and specializes in manure management systems, ventilation design, and comprehensive nutrient management planning. His practical approach to engineering and his ability to work effectively with farmers, contractors, and regulatory agencies make him a valued member of the AEA team.',
-    photoUrl: '',
-    displayOrder: 2,
-    isActive: true
+    photo_url: '',
+    display_order: 2,
+    is_active: true
   },
   {
     name: 'Kara Niemeir',
     title: 'Engineer / Associate',
     bio: 'Kara Niemeir is an engineer and associate at Agricultural Engineering Associates. Kara contributes to the firm\'s livestock facility design, nutrient management planning, and natural resource development projects. She holds a degree in Biological Engineering and brings strong analytical skills and a fresh perspective to the AEA team. Kara has been involved in the design of dairy and livestock facilities, development of comprehensive nutrient management plans, and environmental compliance projects. Her attention to detail and commitment to sustainable agricultural practices make her an important part of the firm\'s continued success.',
-    photoUrl: '',
-    displayOrder: 3,
-    isActive: true
+    photo_url: '',
+    display_order: 3,
+    is_active: true
   }
 ];
 
@@ -256,96 +250,138 @@ const projects = [
     description: 'Provided engineering design and construction oversight for a modern dairy production facility in Honduras. The project included animal housing, milking systems, feed storage, and waste management infrastructure adapted to the tropical climate and local conditions. Worked with international development partners to ensure the facility met both production goals and environmental standards.',
     category: 'International Livestock Production',
     location: 'Honduras',
-    displayOrder: 1,
-    isActive: true
+    display_order: 1,
+    is_active: true
   },
   {
     title: 'Dairy Modernization Program - Guatemala',
     description: 'Led the engineering and design effort for a dairy modernization program in Guatemala. The project involved upgrading existing dairy facilities and designing new production infrastructure to improve milk quality, increase production efficiency, and enhance animal welfare. Provided training to local operators on facility management and maintenance.',
     category: 'International Livestock Production',
     location: 'Guatemala',
-    displayOrder: 2,
-    isActive: true
+    display_order: 2,
+    is_active: true
   },
   {
     title: 'Large-Scale Dairy Facility - Pennsylvania',
     description: 'Designed and managed construction of a large-scale dairy facility in Pennsylvania including free-stall barns, double-12 parallel milking parlor, feed storage and handling systems, and a comprehensive manure management system. The facility was designed to house over 1,000 cows and incorporates advanced ventilation, cow comfort features, and efficient workflow design.',
     category: 'Domestic Livestock Production',
     location: 'Pennsylvania',
-    displayOrder: 1,
-    isActive: true
+    display_order: 1,
+    is_active: true
   },
   {
     title: 'Swine Production Facility - Virginia',
     description: 'Provided complete engineering services for a swine production facility in Virginia, including building design, environmental control systems, feed delivery systems, and waste management. The facility was designed to meet stringent environmental regulations while maximizing production efficiency and animal welfare standards.',
     category: 'Domestic Livestock Production',
     location: 'Virginia',
-    displayOrder: 2,
-    isActive: true
+    display_order: 2,
+    is_active: true
   },
   {
     title: 'Watershed Restoration Project - Chesapeake Bay Region',
     description: 'Worked with federal and state agencies on a watershed restoration project in the Chesapeake Bay region. The project involved stream bank stabilization, riparian buffer establishment, wetland restoration, and agricultural best management practice implementation. Engineering designs were developed to reduce sediment and nutrient loading to local waterways while maintaining agricultural productivity.',
     category: 'Natural Resources Development',
     location: 'Chesapeake Bay Region, Maryland',
-    displayOrder: 1,
-    isActive: true
+    display_order: 1,
+    is_active: true
   },
   {
     title: 'Rural Community Agricultural Center - West Virginia',
     description: 'Designed a multi-use agricultural center for a rural community in West Virginia. The facility includes a farmers market building, agricultural education center, demonstration kitchen, and community meeting space. The project was designed to support local agricultural producers, promote rural economic development, and strengthen the community\'s connection to its agricultural heritage.',
     category: 'Rural Development',
     location: 'West Virginia',
-    displayOrder: 1,
-    isActive: true
+    display_order: 1,
+    is_active: true
   }
 ];
 
 const migrate = async () => {
   try {
-    await mongoose.connect(process.env.MONGODB_URI);
-    console.log('MongoDB connected');
+    // Test connection
+    const { error: testError } = await supabase.from('admins').select('id').limit(1);
+    if (testError) throw testError;
+    console.log('Supabase connected');
 
     // Upsert page content
     for (const page of pages) {
-      await PageContent.findOneAndUpdate(
-        { pageName: page.pageName },
-        { $set: { sections: page.sections } },
-        { upsert: true, new: true }
-      );
+      const { error } = await supabase
+        .from('page_contents')
+        .upsert(
+          { page_name: page.pageName, sections: page.sections },
+          { onConflict: 'page_name' }
+        );
+      if (error) throw error;
       console.log(`Page upserted: ${page.pageName}`);
     }
 
     // Upsert settings
-    await Settings.findOneAndUpdate(
-      {},
-      { $set: defaultSettings },
-      { upsert: true, new: true }
-    );
+    const { data: existingSettings } = await supabase
+      .from('settings')
+      .select('id')
+      .limit(1)
+      .maybeSingle();
+
+    if (existingSettings) {
+      const { error } = await supabase
+        .from('settings')
+        .update(defaultSettings)
+        .eq('id', existingSettings.id);
+      if (error) throw error;
+    } else {
+      const { error } = await supabase
+        .from('settings')
+        .insert(defaultSettings);
+      if (error) throw error;
+    }
     console.log('Settings upserted');
 
     // Upsert staff members
     for (const member of staffMembers) {
-      await StaffMember.findOneAndUpdate(
-        { name: member.name },
-        { $set: member },
-        { upsert: true, new: true }
-      );
+      const { data: existing } = await supabase
+        .from('staff_members')
+        .select('id')
+        .eq('name', member.name)
+        .maybeSingle();
+
+      if (existing) {
+        const { error } = await supabase
+          .from('staff_members')
+          .update(member)
+          .eq('id', existing.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('staff_members')
+          .insert(member);
+        if (error) throw error;
+      }
       console.log(`Staff member upserted: ${member.name}`);
     }
 
     // Upsert projects
     for (const project of projects) {
-      await Project.findOneAndUpdate(
-        { title: project.title },
-        { $set: project },
-        { upsert: true, new: true }
-      );
+      const { data: existing } = await supabase
+        .from('projects')
+        .select('id')
+        .eq('title', project.title)
+        .maybeSingle();
+
+      if (existing) {
+        const { error } = await supabase
+          .from('projects')
+          .update(project)
+          .eq('id', existing.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('projects')
+          .insert(project);
+        if (error) throw error;
+      }
       console.log(`Project upserted: ${project.title}`);
     }
 
     console.log('\nMigration complete.');
-    await mongoose.disconnect();
   } catch (error) {
     console.error('Migration error:', error);
     process.exit(1);

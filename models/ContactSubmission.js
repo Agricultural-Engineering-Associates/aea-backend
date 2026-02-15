@@ -1,39 +1,65 @@
-const mongoose = require('mongoose');
+const supabase = require('../config/db');
+const { transformRow, toDB } = require('./utils');
 
-const contactSubmissionSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  email: {
-    type: String,
-    required: true,
-    trim: true,
-    lowercase: true
-  },
-  subject: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  message: {
-    type: String,
-    required: true
-  },
-  isRead: {
-    type: Boolean,
-    default: false
-  }
-}, { timestamps: true });
+const getAll = async () => {
+  const { data, error } = await supabase
+    .from('contact_submissions')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(transformRow);
+};
 
-contactSubmissionSchema.set('toJSON', {
-  transform: (doc, ret) => {
-    ret.id = ret._id.toString();
-    delete ret._id;
-    delete ret.__v;
-    return ret;
-  }
-});
+const getById = async (id) => {
+  const { data, error } = await supabase
+    .from('contact_submissions')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? transformRow(data) : null;
+};
 
-module.exports = mongoose.model('ContactSubmission', contactSubmissionSchema);
+const create = async (submissionData) => {
+  const dbData = toDB(submissionData);
+  const { data, error } = await supabase
+    .from('contact_submissions')
+    .insert(dbData)
+    .select()
+    .single();
+  if (error) throw error;
+  return transformRow(data);
+};
+
+const markAsRead = async (id) => {
+  const { data, error } = await supabase
+    .from('contact_submissions')
+    .update({ is_read: true })
+    .eq('id', id)
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  return data ? transformRow(data) : null;
+};
+
+const remove = async (id) => {
+  const { data, error } = await supabase
+    .from('contact_submissions')
+    .delete()
+    .eq('id', id)
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  return data ? transformRow(data) : null;
+};
+
+const getUnreadCount = async () => {
+  const { count, error } = await supabase
+    .from('contact_submissions')
+    .select('*', { count: 'exact', head: true })
+    .eq('is_read', false);
+  if (error) throw error;
+  return count;
+};
+
+module.exports = { getAll, getById, create, markAsRead, delete: remove, getUnreadCount };

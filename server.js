@@ -2,14 +2,14 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 
-const connectDB = require('./config/db');
+const supabase = require('./config/db');
 const publicRoutes = require('./routes/public');
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 
 const app = express();
 
-connectDB();
+supabase.testConnection();
 
 app.use(cors({
   origin: process.env.FRONTEND_URL,

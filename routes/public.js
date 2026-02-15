@@ -12,7 +12,7 @@ const router = express.Router();
 // GET /api/public/settings
 router.get('/settings', async (req, res) => {
   try {
-    const settings = await Settings.findOne();
+    const settings = await Settings.get();
     if (!settings) {
       return res.json({});
     }
@@ -26,7 +26,7 @@ router.get('/settings', async (req, res) => {
 // GET /api/public/pages/:pageName
 router.get('/pages/:pageName', async (req, res) => {
   try {
-    const page = await PageContent.findOne({ pageName: req.params.pageName });
+    const page = await PageContent.findByPageName(req.params.pageName);
     if (!page) {
       return res.status(404).json({ error: 'Page not found' });
     }
@@ -40,7 +40,7 @@ router.get('/pages/:pageName', async (req, res) => {
 // GET /api/public/staff
 router.get('/staff', async (req, res) => {
   try {
-    const staff = await StaffMember.find({ isActive: true }).sort({ displayOrder: 1 });
+    const staff = await StaffMember.getAll(true);
     res.json(staff);
   } catch (error) {
     console.error('Error fetching staff:', error);
@@ -51,7 +51,7 @@ router.get('/staff', async (req, res) => {
 // GET /api/public/projects
 router.get('/projects', async (req, res) => {
   try {
-    const projects = await Project.find({ isActive: true }).sort({ category: 1, displayOrder: 1 });
+    const projects = await Project.getAll(true);
     res.json(projects);
   } catch (error) {
     console.error('Error fetching projects:', error);
@@ -102,7 +102,7 @@ router.post('/contact', [
       }
     }
 
-    res.status(201).json({ message: 'Message sent successfully', id: submission._id });
+    res.status(201).json({ message: 'Message sent successfully', id: submission.id });
   } catch (error) {
     console.error('Error saving contact submission:', error);
     res.status(500).json({ error: 'Failed to send message' });
